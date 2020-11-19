@@ -12,11 +12,30 @@
 #define RESOURCE_SERVER_PORT 106
 #define BUF_SIZE 256
 
-//Load from Cache syntax: load filename (Returns the length of the file followed by the contents.)
-//Store to Cache syntax: store filename n:[contents]  (Saves the filename in the cache with n being the size and contents being the contents)
-//Delete Cache syntax: rm filename (Deletes the file from the cache.)
+/*
+Features:
+-You should ensure that operations with the cache are thread safe, meaning, there could exist a race
+condition if one thread deletes a file from memory while another is being read. Also, the data structure
+that you use to manage the cache could be modified by two threads at once. You should handle these
+cases appropriately.
 
-// We make this a global so that we can refer to it in our signal handler
+-Your memory cache server should implement a hash map to quickly lookup if a file exists. Your hash
+function is up to you, but you should use the variable name as input and return an integer where you can
+then take the modulus to determine the entry in the cache. 
+
+-The cache can hold up to 8 entries. The entry in a cache should only hold the most recently stored file. If there is a collision in your hash map,
+replace the current entry with the new one that is being stored.
+
+-In the map, you should also store the filename and size of the file.
+
+-Be sure to ensure there are no memory leaks in your implementation. 
+
+Commands:
+Load from Cache syntax: load filename (Returns the length of the file followed by the contents.)
+Store to Cache syntax: store filename n:[contents]  (Saves the filename in the cache with n being the size and contents being the contents)
+Delete Cache syntax: rm filename (Deletes the file from the cache.)
+*/
+
 int serverSocket;
 
 // We need to make sure we close the connection on signal received, otherwise we have to wait for server to timeout.
@@ -26,7 +45,7 @@ void closeConnection() {
     exit(1);
 }
 
-// Create a separate method for
+// Handle request
 void * processClientRequest(void * request) {
     int connectionToClient = *(int *)request;
     char receiveLine[BUF_SIZE];
