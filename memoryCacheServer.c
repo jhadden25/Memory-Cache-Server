@@ -63,7 +63,7 @@ void * processClientRequest(void * request) {
         // Print text out to buffer, and then write it to client (connfd)
         snprintf(sendLine, sizeof(sendLine), "true");
       
-        printf("%Sending s\n", sendLine);
+        printf("Sending %s\n", sendLine);
         write(connectionToClient, sendLine, strlen(sendLine));
         
         // Zero out the receive line so we do not get artifacts from before
