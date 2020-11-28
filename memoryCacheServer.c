@@ -8,9 +8,11 @@
 #include <sys/types.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <stdbool.h>
 
-#define RESOURCE_SERVER_PORT 106
+#define RESOURCE_SERVER_PORT 1060
 #define BUF_SIZE 256
+#define CACHE_SIZE 8
 
 /*
 Features:
@@ -36,7 +38,53 @@ Store to Cache syntax: store filename n:[contents]  (Saves the filename in the c
 Delete Cache syntax: rm filename (Deletes the file from the cache.)
 */
 
+struct cachedFile{
+    int key;
+    char fileName[BUF_SIZE];
+    char contents[BUF_SIZE];
+} cachedFile;
+
+struct hashObject {
+    //key 1-CACHE_SIZE
+    int key;
+    char value[BUF_SIZE];
+    //Pointer to next hashObject
+    void* next;
+} hashObject;
+
 int serverSocket;
+struct hashObject* hashArray[CACHE_SIZE];
+//struct cachedFile* cacheArray[CACHE_SIZE]; Necessary?
+
+int hashFileIndex(char * name){
+    int hash = 0;
+    for(int i = 0; i < strlen(name); i++){
+        hash += ((int)name[i]) * 53;
+    }
+    hash %= CACHE_SIZE;
+    return hash;
+}
+
+bool searchHashMap(char * value){
+    bool found = false;
+    int index = hashFileIndex(value);
+    struct hashObject* object = hashArray[index];
+    if(object!=NULL){
+        while(object->next!= NULL){
+            if(strcmp(object->value,value) == 0){
+                found = true;
+            }
+            object= object->next;
+        }
+    }
+    return found;
+}
+
+//Might want to return something with implementation
+void deleteHashMap(){}
+void deleteCache(){}
+//void printHashmap(){}
+//void printCache(){}
 
 // We need to make sure we close the connection on signal received, otherwise we have to wait for server to timeout.
 void closeConnection() {
@@ -63,7 +111,7 @@ void * processClientRequest(void * request) {
         // Print text out to buffer, and then write it to client (connfd)
         snprintf(sendLine, sizeof(sendLine), "true");
       
-        printf("%Sending s\n", sendLine);
+        printf("Sending %s\n", sendLine);
         write(connectionToClient, sendLine, strlen(sendLine));
         
         // Zero out the receive line so we do not get artifacts from before
