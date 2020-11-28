@@ -9,7 +9,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-#define RESOURCE_SERVER_PORT 106
+#define RESOURCE_SERVER_PORT 1060
 #define BUF_SIZE 256
 
 /*
@@ -38,6 +38,96 @@ Delete Cache syntax: rm filename (Deletes the file from the cache.)
 
 int serverSocket;
 
+struct entry
+{  
+    char name[32];
+	int order;
+    int length;
+};
+struct entry entryarr[8];
+
+
+void * store(void *inputReceived) 
+{
+	 char * receiveLine = (char*)inputReceived;
+	 char fileName[32];
+	 char fileLength[32];
+	 int fileStart;
+	 int fileEnd;
+	 int lengthEnd;
+	 char lengthOfFile[32];
+	 
+	//Find Where FileName Starts And Ends in receiveLine
+	for(int i=0; i<8; i++)
+	{
+		if(receiveLine[i] == ' ')
+		{
+			fileStart = i+1;
+			for(int j=(fileStart); j<(fileStart+32); j++)
+			{
+				if(receiveLine[j] == ' ')
+				{
+					fileEnd = j;
+					break;
+				}
+			}
+			break;
+		}
+	}
+	
+	//Find Where Declared Length of File Ends
+	for(int i=0; i<BUF_SIZE; i++)
+	{
+		if(receiveLine[i] == ':')
+		{
+			lengthEnd = i;
+			break;
+		}
+	}
+	
+	// Parse File Name to fileName[]
+	for(int i=fileStart; i<fileEnd+1; i++)
+			{
+				if(receiveLine[i] == ' ')
+				{
+					fileName[i] = '\0';
+					break;
+				}
+				else
+					fileName[i] = receiveLine[i];
+			}
+			
+	//Parse Length of File
+	int lengthIndex = 0;
+	for(int i=(fileEnd+1); i<lengthEnd; i++)
+	{
+		lengthOfFile[lengthIndex] = receiveLine[i];
+		lengthIndex++;
+		if(i == lengthIndex-1) // Last Time through the loop add null terminator and reset index. atoi Function needs null terminator;
+		{
+			lengthOfFile[lengthIndex] = '\0';
+			lengthIndex = 0;
+		}
+	}
+	
+	//Create First Open Slot Using Data Parsed
+	for(int i=0; i<8; i++)
+	{
+		if(entryarr[i].length > 0) {}
+		
+		else
+		{
+				strncpy(entryarr[i].name, fileName, 32);
+				entryarr[i].length = atoi(lengthOfFile);
+				break;
+		}
+	}
+}
+
+//void remove() {}
+
+//void load() {}
+
 // We need to make sure we close the connection on signal received, otherwise we have to wait for server to timeout.
 void closeConnection() {
     printf("\nClosing Connection with file descriptor: %d \n", serverSocket);
@@ -60,6 +150,23 @@ void * processClientRequest(void * request) {
         // Show what client sent
         printf("Received: %s\n", receiveLine);
       
+	 //OUR CODE HERE	
+		char *inputLine = receiveLine;
+		
+	if(receiveLine[0] == 's' && receiveLine[1] == 't' && receiveLine[2] == 'o' && receiveLine[3] == 'r' && receiveLine[4] == 'e')
+	{
+		store(inputLine);
+	}
+	else if(receiveLine[0] == 'r' && receiveLine[1] == 'm')
+	{
+		//remove();
+	}
+	else if(receiveLine[0] == 'l' && receiveLine[1] == 'o' && receiveLine[2] == 'a' && receiveLine[3] == 'd')
+	{
+		//load();
+	}
+	//END OUR CODE
+	  
         // Print text out to buffer, and then write it to client (connfd)
         snprintf(sendLine, sizeof(sendLine), "true");
       
@@ -74,6 +181,11 @@ void * processClientRequest(void * request) {
 
 int main(int argc, char *argv[]) {
     int connectionToClient, bytesReadFromClient;
+	//Initialize Cache Array
+	for(int i=0; i<8; i++)
+	{
+			entryarr[i].order = i;
+	}
   
     // Create a server socket
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
