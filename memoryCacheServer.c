@@ -40,6 +40,7 @@ Delete Cache syntax: rm filename (Deletes the file from the cache.)
 
 struct cachedFile{
     int key;
+	int length;
     char fileName[BUF_SIZE];
     char contents[BUF_SIZE];
 } cachedFile;
@@ -54,7 +55,7 @@ struct hashObject {
 
 int serverSocket;
 struct hashObject* hashArray[CACHE_SIZE];
-//struct cachedFile* cacheArray[CACHE_SIZE]; Necessary?
+struct cachedFile cacheArray[CACHE_SIZE];
 
 int hashFileIndex(char * name){
     int hash = 0;
@@ -85,15 +86,6 @@ void deleteHashMap(){}
 void deleteCache(){}
 //void printHashmap(){}
 //void printCache(){}
-
-struct entry
-{  
-    char name[32];
-	int order;
-    int length;
-};
-struct entry entryarr[8];
-
 
 void * store(void *inputReceived) 
 {
@@ -161,12 +153,12 @@ void * store(void *inputReceived)
 	//Create First Open Slot Using Data Parsed
 	for(int i=0; i<8; i++)
 	{
-		if(entryarr[i].length > 0) {}
+		if(cacheArray[i].key > 0) {}
 		
 		else
 		{
-				strncpy(entryarr[i].name, fileName, 32);
-				entryarr[i].length = atoi(lengthOfFile);
+				strncpy(cacheArray[i].fileName, fileName, 32);
+				cacheArray[i].length = atoi(lengthOfFile);
 				break;
 		}
 	}
@@ -230,10 +222,10 @@ void * processClientRequest(void * request) {
 int main(int argc, char *argv[]) {
     int connectionToClient, bytesReadFromClient;
 	//Initialize Cache Array
-	for(int i=0; i<8; i++)
-	{
-			entryarr[i].order = i;
-	}
+	//for(int i=0; i<8; i++)
+	//{
+	//		entryarr[i].order = i;
+	//}
   
     // Create a server socket
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
