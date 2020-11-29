@@ -75,6 +75,7 @@ void * store(void *inputReceived)
 {
 	 char * receiveLine = (char*)inputReceived;
 	 char fileName[FILE_SIZE];
+	 char contents[BUF_SIZE];
 	 char fileLength[FILE_SIZE];
 	 int fileStart;
 	 int fileEnd;
@@ -82,7 +83,7 @@ void * store(void *inputReceived)
 	 char lengthOfFile[FILE_SIZE];
 	 
 	//Find Where FileName Starts And Ends in receiveLine
-	for(int i=0; i<8; i++)
+	for(int i=0; i<CACHE_SIZE; i++)
 	{
 		if(receiveLine[i] == ' ')
 		{
@@ -110,38 +111,52 @@ void * store(void *inputReceived)
 	}
 	
 	// Parse File Name to fileName[]
+	int tempCount = 0;
 	for(int i=fileStart; i<fileEnd+1; i++)
 			{
 				if(receiveLine[i] == ' ')
 				{
-					fileName[i] = '\0';
+					fileName[tempCount] = '\0';
+					printf("File Name: %s\n", fileName);
 					break;
 				}
 				else
-					fileName[i] = receiveLine[i];
+				{
+					fileName[tempCount] = receiveLine[i];
+					tempCount++;
+				}
 			}
 	// Parse Contents to contents[]
-	for(int i=fileEnd+2; i<(BUF_SIZE); i++)
+	tempCount = 0;
+	for(int i=lengthEnd+2; i<(BUF_SIZE); i++)
 			{
 				if(receiveLine[i] == ']')
 				{
-					fileName[i] = '\0';
+					contents[tempCount] = '\0';
+					printf("Contents: %s\n", contents);
 					break;
 				}
 				else
-					contents[i] = receiveLine[i];
+				{
+					contents[tempCount] = receiveLine[i];
+					tempCount++;
+				}
 			}
 			
 	//Parse Length of File
 	int lengthIndex = 0;
-	for(int i=(lengthEnd+1); i<lengthEnd; i++)
+	for(int i=(fileEnd+1); i<lengthEnd+FILE_SIZE; i++)
 	{
-		lengthOfFile[lengthIndex] = receiveLine[i];
-		lengthIndex++;
-		if(i == lengthIndex-1) // Last Time through the loop add null terminator and reset index. atoi Function needs null terminator;
+		if(i == lengthEnd) // Last Time through the loop add null terminator and reset index. atoi Function needs null terminator;
 		{
 			lengthOfFile[lengthIndex] = '\0';
 			lengthIndex = 0;
+			printf("Length: %s\n", lengthOfFile);
+		}
+		else
+		{
+		lengthOfFile[lengthIndex] = receiveLine[i];
+		lengthIndex++;
 		}
 	}
 
@@ -189,7 +204,7 @@ void * store(void *inputReceived)
 }
 
 //Deletes the file from the cache.
-void * remove(void * inputReceived) {
+/*void * remove(void * inputReceived) {
 	char * receiveLine= (char *)inputReceived;
 	char command[FILE_SIZE];
 	char fileName[FILE_SIZE];
@@ -205,12 +220,12 @@ void * remove(void * inputReceived) {
 		}
 	}
 	return NULL;
-}
+}*/
 
 //Returns the length of the file followed by the contents.
-void * load(void * inputReceived) {
+/*void * load(void * inputReceived) {
 	return NULL;
-}
+}*/
 
 // We need to make sure we close the connection on signal received, otherwise we have to wait for server to timeout.
 void closeConnection() {
@@ -243,11 +258,11 @@ void * processClientRequest(void * request) {
 		}
 		else if(strncmp(receiveLine, "rm", 2)==0)
 		{
-			remove(inputLine);
+			//remove(inputLine);
 		}
 		else if(strncmp(receiveLine, "load", 4)==0)
 		{
-			load(inputLine);
+			//load(inputLine);
 		}
 		//END OUR CODE
 	  
