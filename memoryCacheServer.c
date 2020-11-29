@@ -130,10 +130,21 @@ void * store(void *inputReceived)
 				else
 					fileName[i] = receiveLine[i];
 			}
+	// Parse Contents to contents[]
+	for(int i=fileEnd+2; i<(BUF_SIZE); i++)
+			{
+				if(receiveLine[i] == ']')
+				{
+					fileName[i] = '\0';
+					break;
+				}
+				else
+					contents[i] = receiveLine[i];
+			}
 			
 	//Parse Length of File
 	int lengthIndex = 0;
-	for(int i=(fileEnd+1); i<lengthEnd; i++)
+	for(int i=(lengthEnd+1); i<lengthEnd; i++)
 	{
 		lengthOfFile[lengthIndex] = receiveLine[i];
 		lengthIndex++;
