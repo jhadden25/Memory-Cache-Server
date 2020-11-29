@@ -77,6 +77,9 @@ bool searchHashMap(char * name){
     return found;
 }
 
+void parseCommandAndFileName(char * inputReceived, char * command, char * fileName){
+	//Can't return an array, so we must modify existing strings
+}
 //Might want to return something with implementation
 //void printCache(){}
 
@@ -92,7 +95,7 @@ void * store(void *inputReceived)
 	 char lengthOfFile[FILE_SIZE];
 	 
 	//Find Where FileName Starts And Ends in receiveLine
-	for(int i=0; i<CACHE_SIZE; i++)
+	for(int i=0; i<8; i++)
 	{
 		if(receiveLine[i] == ' ')
 		{
@@ -189,7 +192,23 @@ void * store(void *inputReceived)
 
 //Deletes the file from the cache.
 void * remove(void * inputReceived) {
-	//deleteHashMap();
+	char * receiveLine= (char *)inputReceived;
+	int index = hashFileIndex(receiveLine);
+	struct cachedFile* file = cacheArray[index];
+	bool found=false;
+	if(file!=NULL){
+		while(file->next!=NULL){
+			if(file->fileName==fileName){
+				found=true;
+				//overwrite
+			}
+			file= file->next;
+		}
+		if (found==true){
+			//save new
+		}
+
+	}
 	return NULL;
 }
 
