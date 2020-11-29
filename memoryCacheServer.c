@@ -37,22 +37,16 @@ rm filename (Deletes the file from the cache.)
 */
 
 struct cachedFile{
-    int key;
+    //Key: 1-CACHE_SIZE
+	int key;
     int length;
     char fileName[FILE_SIZE];
     char contents[BUF_SIZE];
+	//Pointer to next cachedFile with same array index
+	void* next;
 } cachedFile;
 
-struct hashObject {
-    //key 1-CACHE_SIZE
-    int key;
-    char name[FILE_SIZE];
-    //Pointer to next hashObject
-    void* next;
-} hashObject;
-
 int serverSocket;
-struct hashObject* hashArray[CACHE_SIZE];
 struct cachedFile* cacheArray[CACHE_SIZE];
 
 //Takes in a name string and returns the resulting index for the hashmap 
@@ -71,13 +65,13 @@ int hashFileIndex(char * name){
 bool searchHashMap(char * name){
     bool found = false;
     int index = hashFileIndex(name);
-    struct hashObject* object = hashArray[index];
-    if(object!=NULL){
-        while(object->next!= NULL){
-            if(strcmp(object->name,name) == 0){
+    struct cachedFile* file = cacheArray[index];
+    if(file!=NULL){
+        while(file->next!= NULL){
+            if(strcmp(file->fileName,name) == 0){
                 found = true;
             }
-            object= object->next;
+            file = file->next;
         }
     }
     return found;
@@ -151,19 +145,47 @@ void * store(void *inputReceived)
 			lengthIndex = 0;
 		}
 	}
-	
+
+	/*
+	So we have one array for the cache called cacheArray[]. The array is made of pointers for structs named cachedFile. 
+	The cachedFile contains all information on the file as well as a key and a pointer. The key is used to determine how many 
+	objects are in the array. The pointer should be for another cachedFile* for a cachedFile with the same index. The index is 
+	determine by the hash function, which takes in a name string and returns the index as an int. Use the hash function to 
+	determine the location in cachedArray[]. Store it there if it is empty. Overwrite it if it is the same file name. 
+	Set it as the pointer of the last object if it is new. If it is new, be sure to kick out the oldest cachedFile and change
+	the keys of all files.
+	*/
+
+	int index = hashFileIndex(fileName);
+	struct cachedFile* file = cacheArray[index];
+	bool found=false;
+	if(file!=NULL){
+		while(file->next!=NULL){
+			if(file->fileName==fileName){
+				found=true;
+				//overwrite
+			}
+		}
+		if (found==true){
+			//save new
+		}
+
+	}
+
 	//Create First Open Slot Using Data Parsed
+	/*
 	for(int i=0; i<CACHE_SIZE; i++)
 	{
-		if(cacheArray[i].key > 0) {}
+		if(cacheArray[i]->key > 0) {}
 		
 		else
 		{
-				strncpy(cacheArray[i].fileName, fileName, FILE_SIZE);
-				cacheArray[i].length = atoi(lengthOfFile);
+				strncpy(cacheArray[i]->fileName, fileName, FILE_SIZE);
+				cacheArray[i]->length = atoi(lengthOfFile);
 				break;
 		}
 	}
+	*/
 }
 
 //Deletes the file from the cache.
