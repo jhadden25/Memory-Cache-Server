@@ -78,8 +78,6 @@ bool searchHashMap(char * name){
 }
 
 //Might want to return something with implementation
-void deleteHashMap(){}
-//void printHashmap(){}
 //void printCache(){}
 
 //Saves the filename in the cache with n being the size and contents being the contents
@@ -165,6 +163,7 @@ void * store(void *inputReceived)
 				found=true;
 				//overwrite
 			}
+			file= file->next;
 		}
 		if (found==true){
 			//save new
