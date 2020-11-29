@@ -36,6 +36,7 @@ store filename n:[contents]  (Saves the filename in the cache with n being the s
 rm filename (Deletes the file from the cache.)
 */
 
+//Cached file object
 struct cachedFile{
     //Key: 1-CACHE_SIZE
 	int key;
@@ -46,6 +47,7 @@ struct cachedFile{
 	void* next;
 } cachedFile;
 
+//Global Variables
 int serverSocket;
 struct cachedFile* cacheArray[CACHE_SIZE];
 
@@ -61,27 +63,12 @@ int hashFileIndex(char * name){
     return hash;
 }
 
-//Takes the name of a file and searches through the hashmap to see if it is present and returns a boolean for its presence
-bool searchHashMap(char * name){
-    bool found = false;
-    int index = hashFileIndex(name);
-    struct cachedFile* file = cacheArray[index];
-    if(file!=NULL){
-        while(file->next!= NULL){
-            if(strcmp(file->fileName,name) == 0){
-                found = true;
-            }
-            file = file->next;
-        }
-    }
-    return found;
-}
-
 void parseCommandAndFileName(char * inputReceived, char * command, char * fileName){
 	//Can't return an array, so we must modify existing strings
 }
+
 //Might want to return something with implementation
-//void printCache(){}
+void printCache(){}
 
 //Saves the filename in the cache with n being the size and contents being the contents
 void * store(void *inputReceived) 
@@ -173,7 +160,7 @@ void * store(void *inputReceived)
 	bool found=false;
 	if(file!=NULL){
 		while(file->next!=NULL){
-			if(file->fileName==fileName){
+			if(strcmp(file->fileName,fileName)==0){
 				found=true;
 				//overwrite
 			}
@@ -204,21 +191,18 @@ void * store(void *inputReceived)
 //Deletes the file from the cache.
 void * remove(void * inputReceived) {
 	char * receiveLine= (char *)inputReceived;
-	int index = hashFileIndex(receiveLine);
+	char command[FILE_SIZE];
+	char fileName[FILE_SIZE];
+	parseCommandAndFileName(receiveLine, command, fileName);
+	int index = hashFileIndex(fileName);
 	struct cachedFile* file = cacheArray[index];
-	bool found=false;
 	if(file!=NULL){
 		while(file->next!=NULL){
 			if(file->fileName==fileName){
-				found=true;
-				//overwrite
+				//delete and set previous pointer as 'file->next
 			}
 			file= file->next;
 		}
-		if (found==true){
-			//save new
-		}
-
 	}
 	return NULL;
 }
