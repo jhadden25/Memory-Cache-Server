@@ -12,20 +12,18 @@
 
 #define RESOURCE_SERVER_PORT 1060
 #define BUF_SIZE 256
+#define FILE_SIZE 32
 #define CACHE_SIZE 8
 
 /*
 Features:
--You should ensure that operations with the cache are thread safe, meaning, there could exist a race
-condition if one thread deletes a file from memory while another is being read. Also, the data structure
-that you use to manage the cache could be modified by two threads at once. You should handle these
-cases appropriately.
+-Thread safe. Also, the data structure that you use to manage the cache could be modified by two threads at once.
+ You should handle these cases appropriately.
 
--Your memory cache server should implement a hash map to quickly lookup if a file exists. Your hash
-function is up to you, but you should use the variable name as input and return an integer where you can
-then take the modulus to determine the entry in the cache. 
+-Your memory cache server should implement a hash map to quickly lookup if a file exists. Use the variable name as input 
+and return an integer where you can then take the modulus to determine the entry in the cache. 
 
--The cache can hold up to 8 entries. The entry in a cache should only hold the most recently stored file. If there is a collision in your hash map,
+-The entry in a cache should only hold the most recently stored file. If there is a collision in your hash map,
 replace the current entry with the new one that is being stored.
 
 -In the map, you should also store the filename and size of the file.
@@ -33,46 +31,50 @@ replace the current entry with the new one that is being stored.
 -Be sure to ensure there are no memory leaks in your implementation. 
 
 Commands:
-Load from Cache syntax: load filename (Returns the length of the file followed by the contents.)
-Store to Cache syntax: store filename n:[contents]  (Saves the filename in the cache with n being the size and contents being the contents)
-Delete Cache syntax: rm filename (Deletes the file from the cache.)
+load filename (Returns the length of the file followed by the contents.)
+store filename n:[contents]  (Saves the filename in the cache with n being the size and contents being the contents)
+rm filename (Deletes the file from the cache.)
 */
 
 struct cachedFile{
     int key;
-	int length;
-    char fileName[BUF_SIZE];
+    int length;
+    char fileName[FILE_SIZE];
     char contents[BUF_SIZE];
 } cachedFile;
 
 struct hashObject {
     //key 1-CACHE_SIZE
     int key;
-    char value[BUF_SIZE];
+    char name[FILE_SIZE];
     //Pointer to next hashObject
     void* next;
 } hashObject;
 
 int serverSocket;
 struct hashObject* hashArray[CACHE_SIZE];
-struct cachedFile cacheArray[CACHE_SIZE];
+struct cachedFile* cacheArray[CACHE_SIZE];
 
+//Takes in a name string and returns the resulting index for the hashmap 
 int hashFileIndex(char * name){
     int hash = 0;
+	//Iterates through the char * name and takes the numerical values of the characters and multiplies by the prime number 53
     for(int i = 0; i < strlen(name); i++){
         hash += ((int)name[i]) * 53;
     }
+	//Sets the hash as the modulus of the resulting hash and the size of the cache
     hash %= CACHE_SIZE;
     return hash;
 }
 
-bool searchHashMap(char * value){
+//Takes the name of a file and searches through the hashmap to see if it is present and returns a boolean for its presence
+bool searchHashMap(char * name){
     bool found = false;
-    int index = hashFileIndex(value);
+    int index = hashFileIndex(name);
     struct hashObject* object = hashArray[index];
     if(object!=NULL){
         while(object->next!= NULL){
-            if(strcmp(object->value,value) == 0){
+            if(strcmp(object->name,name) == 0){
                 found = true;
             }
             object= object->next;
@@ -83,27 +85,27 @@ bool searchHashMap(char * value){
 
 //Might want to return something with implementation
 void deleteHashMap(){}
-void deleteCache(){}
 //void printHashmap(){}
 //void printCache(){}
 
+//Saves the filename in the cache with n being the size and contents being the contents
 void * store(void *inputReceived) 
 {
 	 char * receiveLine = (char*)inputReceived;
-	 char fileName[32];
-	 char fileLength[32];
+	 char fileName[FILE_SIZE];
+	 char fileLength[FILE_SIZE];
 	 int fileStart;
 	 int fileEnd;
 	 int lengthEnd;
-	 char lengthOfFile[32];
+	 char lengthOfFile[FILE_SIZE];
 	 
 	//Find Where FileName Starts And Ends in receiveLine
-	for(int i=0; i<8; i++)
+	for(int i=0; i<CACHE_SIZE; i++)
 	{
 		if(receiveLine[i] == ' ')
 		{
 			fileStart = i+1;
-			for(int j=(fileStart); j<(fileStart+32); j++)
+			for(int j=(fileStart); j<(fileStart+FILE_SIZE); j++)
 			{
 				if(receiveLine[j] == ' ')
 				{
@@ -151,22 +153,29 @@ void * store(void *inputReceived)
 	}
 	
 	//Create First Open Slot Using Data Parsed
-	for(int i=0; i<8; i++)
+	for(int i=0; i<CACHE_SIZE; i++)
 	{
 		if(cacheArray[i].key > 0) {}
 		
 		else
 		{
-				strncpy(cacheArray[i].fileName, fileName, 32);
+				strncpy(cacheArray[i].fileName, fileName, FILE_SIZE);
 				cacheArray[i].length = atoi(lengthOfFile);
 				break;
 		}
 	}
 }
 
-//void remove() {}
+//Deletes the file from the cache.
+void * remove(void * inputReceived) {
+	//deleteHashMap();
+	return NULL;
+}
 
-//void load() {}
+//Returns the length of the file followed by the contents.
+void * load(void * inputReceived) {
+	return NULL;
+}
 
 // We need to make sure we close the connection on signal received, otherwise we have to wait for server to timeout.
 void closeConnection() {
@@ -190,22 +199,22 @@ void * processClientRequest(void * request) {
         // Show what client sent
         printf("Received: %s\n", receiveLine);
       
-	 //OUR CODE HERE	
+	 	//OUR CODE HERE	
 		char *inputLine = receiveLine;
 		
-	if(receiveLine[0] == 's' && receiveLine[1] == 't' && receiveLine[2] == 'o' && receiveLine[3] == 'r' && receiveLine[4] == 'e')
-	{
-		store(inputLine);
-	}
-	else if(receiveLine[0] == 'r' && receiveLine[1] == 'm')
-	{
-		//remove();
-	}
-	else if(receiveLine[0] == 'l' && receiveLine[1] == 'o' && receiveLine[2] == 'a' && receiveLine[3] == 'd')
-	{
-		//load();
-	}
-	//END OUR CODE
+		if(strncmp(receiveLine, "store", 4)==0)
+		{
+			store(inputLine);
+		}
+		else if(strncmp(receiveLine, "rm", 2)==0)
+		{
+			remove(inputLine);
+		}
+		else if(strncmp(receiveLine, "load", 4)==0)
+		{
+			load(inputLine);
+		}
+		//END OUR CODE
 	  
         // Print text out to buffer, and then write it to client (connfd)
         snprintf(sendLine, sizeof(sendLine), "true");
@@ -222,7 +231,7 @@ void * processClientRequest(void * request) {
 int main(int argc, char *argv[]) {
     int connectionToClient, bytesReadFromClient;
 	//Initialize Cache Array
-	//for(int i=0; i<8; i++)
+	//for(int i=0; i<CACHE_SIZE; i++)
 	//{
 	//		entryarr[i].order = i;
 	//}
@@ -265,6 +274,5 @@ int main(int argc, char *argv[]) {
         // Kick off a thread to process request
         pthread_t someThread;
         pthread_create(&someThread, NULL, processClientRequest, (void *)&connectionToClient);
-        
     }
 }
