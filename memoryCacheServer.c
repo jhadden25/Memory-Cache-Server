@@ -10,7 +10,7 @@
 #include <semaphore.h>
 #include <stdbool.h>
 
-#define RESOURCE_SERVER_PORT 1060
+#define RESOURCE_SERVER_PORT 1061
 #define BUF_SIZE 256
 #define FILE_SIZE 32
 #define CACHE_SIZE 8
@@ -50,6 +50,9 @@ struct cachedFile{
 //Global Variables
 int serverSocket;
 struct cachedFile* cacheArray[CACHE_SIZE];
+char fileName[FILE_SIZE];
+int fileStart;
+int fileEnd;
 
 //Takes in a name string and returns the resulting index for the hashmap 
 int hashFileIndex(char * name){
@@ -63,25 +66,9 @@ int hashFileIndex(char * name){
     return hash;
 }
 
-void parseCommandAndFileName(char * inputReceived, char * command, char * fileName){
+void parseFileName(char * inputReceived){
 	//Can't return an array, so we must modify existing strings
-}
-
-//Might want to return something with implementation
-void printCache(){}
-
-//Saves the filename in the cache with n being the size and contents being the contents
-void * store(void *inputReceived) 
-{
-	 char * receiveLine = (char*)inputReceived;
-	 char fileName[FILE_SIZE];
-	 char contents[BUF_SIZE];
-	 char fileLength[FILE_SIZE];
-	 int fileStart;
-	 int fileEnd;
-	 int lengthEnd;
-	 char lengthOfFile[FILE_SIZE];
-	 
+	char * receiveLine = inputReceived;
 	//Find Where FileName Starts And Ends in receiveLine
 	for(int i=0; i<CACHE_SIZE; i++)
 	{
@@ -96,16 +83,6 @@ void * store(void *inputReceived)
 					break;
 				}
 			}
-			break;
-		}
-	}
-	
-	//Find Where Declared Length of File Ends
-	for(int i=0; i<BUF_SIZE; i++)
-	{
-		if(receiveLine[i] == ':')
-		{
-			lengthEnd = i;
 			break;
 		}
 	}
@@ -126,8 +103,34 @@ void * store(void *inputReceived)
 					tempCount++;
 				}
 			}
+}
+
+//Might want to return something with implementation
+void printCache(){}
+
+//Saves the filename in the cache with n being the size and contents being the contents
+void * store(void *inputReceived) 
+{
+	 char * receiveLine = (char*)inputReceived;
+	 char contents[BUF_SIZE];
+	 char fileLength[FILE_SIZE];
+	 int lengthEnd;
+	 char lengthOfFile[FILE_SIZE];
+	 // Run Parse File Name
+	 parseFileName(receiveLine);
+	
+	//Find Where Declared Length of File Ends
+	for(int i=0; i<BUF_SIZE; i++)
+	{
+		if(receiveLine[i] == ':')
+		{
+			lengthEnd = i;
+			break;
+		}
+	}
+	
 	// Parse Contents to contents[]
-	tempCount = 0;
+	int tempCount = 0;
 	for(int i=lengthEnd+2; i<(BUF_SIZE); i++)
 			{
 				if(receiveLine[i] == ']')

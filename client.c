@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
-#define SERVER_PORT 1060 // CHANGE THIS!
+#define SERVER_PORT 1061 // CHANGE THIS!
 #define BUF_SIZE 256
 
 int main(int argc, char *argv[]) {
