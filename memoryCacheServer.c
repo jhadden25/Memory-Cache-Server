@@ -77,7 +77,7 @@ void parseFileName(char * inputReceived){
 			fileStart = i+1;
 			for(int j=(fileStart); j<(fileStart+FILE_SIZE); j++)
 			{
-				if(receiveLine[j] == ' ')
+				if(receiveLine[j] == ' ' || receiveLine[j] == '\0')
 				{
 					fileEnd = j;
 					break;
