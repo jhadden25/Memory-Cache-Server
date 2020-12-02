@@ -110,16 +110,20 @@ void parseFileName(char * inputReceived){
 
 //Prints out information on files in cache
 void printCache(){
+	printf("\nPrint Cache:");
 	for (int i=0; i<CACHE_SIZE; i++){
-		printf("\nFile:%s\n", cacheArray[i]->fileName);
-		printf("Size:%d\n", cacheArray[i]->length);
-		printf("Contents:%s\n", cacheArray[i]->contents);
+		if(cacheArray[i]!=NULL){
+			printf("\nFile:%s\n", cacheArray[i]->fileName);
+			printf("Size:%d\n", cacheArray[i]->length);
+			printf("Contents:%s\n", cacheArray[i]->contents);
+		}
 	}
 }
 
 //Saves the filename in the cache with n being the size and contents being the contents
 void * store(void *inputReceived) 
 {
+	 printf("\nStoring File\n");
 	 char * receiveLine = (char*)inputReceived;
 	 char contents[BUF_SIZE];
 	 char fileLength[FILE_SIZE];
@@ -178,36 +182,47 @@ void * store(void *inputReceived)
 	//LOCK FILE HERE!!!!
 	pthread_mutex_lock(&cacheLock);
 	
+	printf("\nModifying File\n");
+
+	//Allocating memory
+	cacheArray[index] = malloc(sizeof(cachedFile));
+
 	//Set the file
 	strcpy(cacheArray[index]->fileName,fileName);
 	strcpy(cacheArray[index]->contents,contents);
-	cacheArray[index]->length=fileLength;
+	cacheArray[index]->length=strlen(contents);
 
 	//Unlock here
 	pthread_mutex_unlock(&cacheLock);
+
+	printf("Worked\n");
+	printCache();
+	free(cacheArray[index]);
 }
 
 //Deletes the file from the cache.
-void remove(void * inputReceived) {
+void removeFile(void * inputReceived) {
+	printf("\nRemoving File\n");
 	char * receiveLine = (char *)inputReceived;
-	parseCommandAndFileName(receiveLine);
+	parseFileName(receiveLine);
 	int index = hashFileIndex(fileName);
 	if (strcmp(cacheArray[index]->fileName, fileName)==0){
 		//Lock here
 		pthread_mutex_lock(&cacheLock);
 
-		//Null out here
-		strcpy(cacheArray[index]->fileName,NULL);
-		strcpy(cacheArray[index]->contents,NULL);
-		cacheArray[index]->length=0;
+		//free or Null here
+		free(cacheArray[index]);
 
 		//Unlock here
 		pthread_mutex_unlock(&cacheLock);
+		printCache();
 	}
 }
 
 //Returns the length of the file followed by the contents.
-void  load(void * inputReceived) {}
+void  load(void * inputReceived) {
+	printf("\nLoading File\n");
+}
 
 // We need to make sure we close the connection on signal received, otherwise we have to wait for server to timeout.
 void closeConnection() {
@@ -240,7 +255,7 @@ void * processClientRequest(void * request) {
 		}
 		else if(strncmp(receiveLine, "rm", 2)==0)
 		{
-			//remove(inputLine);
+			//removeFile(inputLine);
 		}
 		else if(strncmp(receiveLine, "load", 4)==0)
 		{
