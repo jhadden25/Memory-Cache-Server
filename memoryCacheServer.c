@@ -10,45 +10,47 @@
 #include <semaphore.h>
 #include <stdbool.h>
 
-#define RESOURCE_SERVER_PORT 1061
+#define RESOURCE_SERVER_PORT 1060
 #define BUF_SIZE 256
 #define FILE_SIZE 32
 #define CACHE_SIZE 8
 
 /*
 Features:
--Thread safe. Also, the data structure that you use to manage the cache could be modified by two threads at once.
- You should handle these cases appropriately.
+	-Thread safe. Also, the data structure that you use to manage the cache could be modified by two threads at once.
+ 	You should handle these cases appropriately. Be sure to ensure there are no memory leaks in your implementation. 
 
--Your memory cache server should implement a hash map to quickly lookup if a file exists. Use the variable name as input 
-and return an integer where you can then take the modulus to determine the entry in the cache. 
-
--The entry in a cache should only hold the most recently stored file. If there is a collision in your hash map,
-replace the current entry with the new one that is being stored.
-
--In the map, you should also store the filename and size of the file.
-
--Be sure to ensure there are no memory leaks in your implementation. 
+	-The entry in a cache should only hold the most recently stored file. If there is a collision in your hash map,
+	replace the current entry with the new one that is being stored.
 
 Commands:
-load filename (Returns the length of the file followed by the contents.)
-store filename n:[contents]  (Saves the filename in the cache with n being the size and contents being the contents)
-rm filename (Deletes the file from the cache.)
+	load filename (Returns the length of the file followed by the contents.)
+	store filename n:[contents]  (Saves the filename in the cache with n being the size and contents being the contents)
+	rm filename (Deletes the file from the cache.)
+
+Note:
+	So we have one array for the cache called cacheArray[]. The array is made of pointers for structs named cachedFile. 
+	The cachedFile contains all information on the file. The key is the unique name. The index is 
+	determined by the hash function, which takes in a name string and returns the index as an int. Use the hash function to 
+	determine the location.
+
+	Consider a mutex lock for each index
 */
 
 //Cached file object
 struct cachedFile{
-    //Key: 1-CACHE_SIZE
-	int key;
+	//Size
     int length;
+	//This is the unique key!
     char fileName[FILE_SIZE];
+	//Contents of the file
     char contents[BUF_SIZE];
-	//Pointer to next cachedFile with same array index
-	void* next;
+	//No pointer is needed as the file will be replaced when collisions occur
 } cachedFile;
 
 //Global Variables
 int serverSocket;
+static pthread_mutex_t cacheLock = PTHREAD_MUTEX_INITIALIZER;
 struct cachedFile* cacheArray[CACHE_SIZE];
 char fileName[FILE_SIZE];
 int fileStart;
@@ -66,6 +68,7 @@ int hashFileIndex(char * name){
     return hash;
 }
 
+//Parses the filename
 void parseFileName(char * inputReceived){
 	//Can't return an array, so we must modify existing strings
 	char * receiveLine = inputReceived;
@@ -90,23 +93,29 @@ void parseFileName(char * inputReceived){
 	// Parse File Name to fileName[]
 	int tempCount = 0;
 	for(int i=fileStart; i<fileEnd+1; i++)
-			{
-				if(receiveLine[i] == ' ')
-				{
-					fileName[tempCount] = '\0';
-					printf("File Name: %s\n", fileName);
-					break;
-				}
-				else
-				{
-					fileName[tempCount] = receiveLine[i];
-					tempCount++;
-				}
-			}
+	{
+		if(receiveLine[i] == ' ')
+		{
+			fileName[tempCount] = '\0';
+			printf("File Name: %s\n", fileName);
+			break;
+		}
+		else
+		{
+			fileName[tempCount] = receiveLine[i];
+			tempCount++;
+		}
+	}
 }
 
-//Might want to return something with implementation
-void printCache(){}
+//Prints out information on files in cache
+void printCache(){
+	for (int i=0; i<CACHE_SIZE; i++){
+		printf("\nFile:%s\n", cacheArray[i]->fileName);
+		printf("Size:%d\n", cacheArray[i]->length);
+		printf("Contents:%s\n", cacheArray[i]->contents);
+	}
+}
 
 //Saves the filename in the cache with n being the size and contents being the contents
 void * store(void *inputReceived) 
@@ -158,77 +167,47 @@ void * store(void *inputReceived)
 		}
 		else
 		{
-		lengthOfFile[lengthIndex] = receiveLine[i];
-		lengthIndex++;
+			lengthOfFile[lengthIndex] = receiveLine[i];
+			lengthIndex++;
 		}
 	}
 
-	/*
-	So we have one array for the cache called cacheArray[]. The array is made of pointers for structs named cachedFile. 
-	The cachedFile contains all information on the file as well as a key and a pointer. The key is used to determine how many 
-	objects are in the array. The pointer should be for another cachedFile* for a cachedFile with the same index. The index is 
-	determine by the hash function, which takes in a name string and returns the index as an int. Use the hash function to 
-	determine the location in cachedArray[]. Store it there if it is empty. Overwrite it if it is the same file name. 
-	Set it as the pointer of the last object if it is new. If it is new, be sure to kick out the oldest cachedFile and change
-	the keys of all files.
-	*/
-
+	//Find index
 	int index = hashFileIndex(fileName);
-	struct cachedFile* file = cacheArray[index];
-	bool found=false;
-	if(file!=NULL){
-		while(file->next!=NULL){
-			if(strcmp(file->fileName,fileName)==0){
-				found=true;
-				//overwrite
-			}
-			file= file->next;
-		}
-		if (found==true){
-			//save new
-		}
 
-	}
+	//LOCK FILE HERE!!!!
+	pthread_mutex_lock(&cacheLock);
+	
+	//Set the file
+	strcpy(cacheArray[index]->fileName,fileName);
+	strcpy(cacheArray[index]->contents,contents);
+	cacheArray[index]->length=fileLength;
 
-	//Create First Open Slot Using Data Parsed
-	/*
-	for(int i=0; i<CACHE_SIZE; i++)
-	{
-		if(cacheArray[i]->key > 0) {}
-		
-		else
-		{
-				strncpy(cacheArray[i]->fileName, fileName, FILE_SIZE);
-				cacheArray[i]->length = atoi(lengthOfFile);
-				break;
-		}
-	}
-	*/
+	//Unlock here
+	pthread_mutex_unlock(&cacheLock);
 }
 
 //Deletes the file from the cache.
-/*void * remove(void * inputReceived) {
-	char * receiveLine= (char *)inputReceived;
-	char command[FILE_SIZE];
-	char fileName[FILE_SIZE];
-	parseCommandAndFileName(receiveLine, command, fileName);
+void remove(void * inputReceived) {
+	char * receiveLine = (char *)inputReceived;
+	parseCommandAndFileName(receiveLine);
 	int index = hashFileIndex(fileName);
-	struct cachedFile* file = cacheArray[index];
-	if(file!=NULL){
-		while(file->next!=NULL){
-			if(file->fileName==fileName){
-				//delete and set previous pointer as 'file->next
-			}
-			file= file->next;
-		}
+	if (strcmp(cacheArray[index]->fileName, fileName)==0){
+		//Lock here
+		pthread_mutex_lock(&cacheLock);
+
+		//Null out here
+		strcpy(cacheArray[index]->fileName,NULL);
+		strcpy(cacheArray[index]->contents,NULL);
+		cacheArray[index]->length=0;
+
+		//Unlock here
+		pthread_mutex_unlock(&cacheLock);
 	}
-	return NULL;
-}*/
+}
 
 //Returns the length of the file followed by the contents.
-/*void * load(void * inputReceived) {
-	return NULL;
-}*/
+void  load(void * inputReceived) {}
 
 // We need to make sure we close the connection on signal received, otherwise we have to wait for server to timeout.
 void closeConnection() {
@@ -283,12 +262,7 @@ void * processClientRequest(void * request) {
 
 int main(int argc, char *argv[]) {
     int connectionToClient, bytesReadFromClient;
-	//Initialize Cache Array
-	//for(int i=0; i<CACHE_SIZE; i++)
-	//{
-	//		entryarr[i].order = i;
-	//}
-  
+
     // Create a server socket
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in serverAddress;
