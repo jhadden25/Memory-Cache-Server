@@ -10,7 +10,7 @@
 #include <semaphore.h>
 #include <stdbool.h>
 
-#define RESOURCE_SERVER_PORT 1062
+#define RESOURCE_SERVER_PORT 1060
 #define BUF_SIZE 256
 #define FILE_SIZE 32
 #define CACHE_SIZE 8
@@ -185,6 +185,8 @@ void * store(void *inputReceived)
 	int index = hashFileIndex(fileName);
 	
 	printf("FileName:%s\n", fileName); 
+	printf("Index: %d\n", index);
+	
 	//LOCK FILE HERE!!!!
 	pthread_mutex_lock(&cacheLock);
 	
@@ -205,7 +207,7 @@ void * store(void *inputReceived)
 
 	printf("Worked\n");
 	printCache();
-	free(cacheArray[index]);
+	//free(cacheArray[index]);
 }
 
 //Deletes the file from the cache.
