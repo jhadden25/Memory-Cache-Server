@@ -53,8 +53,7 @@ int serverSocket;
 static pthread_mutex_t cacheLock = PTHREAD_MUTEX_INITIALIZER;
 struct cachedFile* cacheArray[CACHE_SIZE];
 char fileName[FILE_SIZE];
-int fileStart;
-int fileEnd;
+
 
 //Takes in a name string and returns the resulting index for the hashmap 
 int hashFileIndex(char * name){
@@ -69,20 +68,20 @@ int hashFileIndex(char * name){
 }
 
 //Parses the filename
-void parseFileName(char * inputReceived){
-	//Can't return an array, so we must modify existing strings
+int * parseFileName(char * inputReceived){
+	int fileEndpoints[2];
 	char * receiveLine = inputReceived;
 	//Find Where FileName Starts And Ends in receiveLine
 	for(int i=0; i<CACHE_SIZE; i++)
 	{
 		if(receiveLine[i] == ' ')
 		{
-			fileStart = i+1;
-			for(int j=(fileStart); j<(fileStart+FILE_SIZE); j++)
+			fileEndpoints[0] = i+1;
+			for(int j=(fileEndpoints[0]); j<(fileEndpoints[0]+FILE_SIZE); j++)
 			{
 				if(receiveLine[j] == ' ' || receiveLine[j] == '\0')
 				{
-					fileEnd = j;
+					fileEndpoints[1] = j;
 					break;
 				}
 			}
@@ -92,7 +91,7 @@ void parseFileName(char * inputReceived){
 	
 	// Parse File Name to fileName[]
 	int tempCount = 0;
-	for(int i=fileStart; i<fileEnd+1; i++)
+	for(int i=fileEndpoints[0]; i<fileEndpoints[1]+1; i++)
 	{
 		if(receiveLine[i] == ' ')
 		{
@@ -106,6 +105,7 @@ void parseFileName(char * inputReceived){
 			tempCount++;
 		}
 	}
+	return fileEndpoints;
 }
 
 //Prints out information on files in cache
@@ -116,6 +116,7 @@ void printCache(){
 			printf("\nFile:%s\n", cacheArray[i]->fileName);
 			printf("Size:%d\n", cacheArray[i]->length);
 			printf("Contents:%s\n", cacheArray[i]->contents);
+			printf("Index:%d\n", i);
 		}
 	}
 }
@@ -130,7 +131,7 @@ void * store(void *inputReceived)
 	 int lengthEnd;
 	 char lengthOfFile[FILE_SIZE];
 	 // Run Parse File Name
-	 parseFileName(receiveLine);
+	 int fileEndpoints[2]= parseFileName(receiveLine);
 	
 	//Find Where Declared Length of File Ends
 	for(int i=0; i<BUF_SIZE; i++)
@@ -161,7 +162,7 @@ void * store(void *inputReceived)
 			
 	//Parse Length of File
 	int lengthIndex = 0;
-	for(int i=(fileEnd+1); i<lengthEnd+FILE_SIZE; i++)
+	for(int i=(fileEndpoints[1]+1); i<lengthEnd+FILE_SIZE; i++)
 	{
 		if(i == lengthEnd) // Last Time through the loop add null terminator and reset index. atoi Function needs null terminator;
 		{
@@ -185,7 +186,9 @@ void * store(void *inputReceived)
 	printf("\nModifying File\n");
 
 	//Allocating memory
-	cacheArray[index] = malloc(sizeof(cachedFile));
+	if (cacheArray[index]!=NULL){
+		cacheArray[index] = malloc(sizeof(cachedFile));
+	}
 
 	//Set the file
 	strcpy(cacheArray[index]->fileName,fileName);
