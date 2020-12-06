@@ -10,7 +10,7 @@
 #include <semaphore.h>
 #include <stdbool.h>
 
-#define RESOURCE_SERVER_PORT 1060
+#define RESOURCE_SERVER_PORT 1060///
 #define BUF_SIZE 256
 #define FILE_SIZE 32
 #define CACHE_SIZE 8
@@ -116,6 +116,8 @@ void printCache(){
 			printf("\nFile:%s\n", cacheArray[i]->fileName);
 			printf("Size:%d\n", cacheArray[i]->length);
 			printf("Contents:%s\n", cacheArray[i]->contents);
+			printf("Index:%d\n", i);
+			
 		}
 	}
 }
@@ -128,6 +130,7 @@ void * store(void *inputReceived)
 	 char contents[BUF_SIZE];
 	 char fileLength[FILE_SIZE];
 	 int lengthEnd;
+	 int lengthParsed;
 	 char lengthOfFile[FILE_SIZE];
 	 // Run Parse File Name
 	 parseFileName(receiveLine);
@@ -167,6 +170,7 @@ void * store(void *inputReceived)
 		{
 			lengthOfFile[lengthIndex] = '\0';
 			lengthIndex = 0;
+			lengthParsed = atoi(lengthOfFile);
 			printf("Length: %s\n", lengthOfFile);
 		}
 		else
@@ -190,7 +194,7 @@ void * store(void *inputReceived)
 	//Set the file
 	strcpy(cacheArray[index]->fileName,fileName);
 	strcpy(cacheArray[index]->contents,contents);
-	cacheArray[index]->length=strlen(contents);
+	cacheArray[index]->length=lengthParsed;
 
 	//Unlock here
 	pthread_mutex_unlock(&cacheLock);
@@ -206,22 +210,36 @@ void removeFile(void * inputReceived) {
 	char * receiveLine = (char *)inputReceived;
 	parseFileName(receiveLine);
 	int index = hashFileIndex(fileName);
-	if (strcmp(cacheArray[index]->fileName, fileName)==0){
+	//if (strcmp(cacheArray[index]->fileName, fileName)==0){
 		//Lock here
-		pthread_mutex_lock(&cacheLock);
+		//pthread_mutex_lock(&cacheLock);
 
 		//free or Null here
 		free(cacheArray[index]);
 
 		//Unlock here
-		pthread_mutex_unlock(&cacheLock);
+		//pthread_mutex_unlock(&cacheLock);
 		printCache();
-	}
+	//}
 }
 
 //Returns the length of the file followed by the contents.
-void  load(void * inputReceived) {
+void load(void * inputReceived) {
 	printf("\nLoading File\n");
+	char * receiveLine = (char *)inputReceived;
+	parseFileName(receiveLine);
+	int index = hashFileIndex(fileName);
+	if (strcmp(cacheArray[index]->fileName, fileName)==0){
+		//Lock here
+		pthread_mutex_lock(&cacheLock);
+
+		//Load Contents
+		//printCache();
+		printf("\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
+
+		//Unlock here
+		pthread_mutex_unlock(&cacheLock);
+	}
 }
 
 // We need to make sure we close the connection on signal received, otherwise we have to wait for server to timeout.
@@ -259,7 +277,7 @@ void * processClientRequest(void * request) {
 		}
 		else if(strncmp(receiveLine, "load", 4)==0)
 		{
-			//load(inputLine);
+			load(inputLine);
 		}
 		//END OUR CODE
 	  
