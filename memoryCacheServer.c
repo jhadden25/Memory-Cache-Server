@@ -10,7 +10,7 @@
 #include <semaphore.h>
 #include <stdbool.h>
 
-#define RESOURCE_SERVER_PORT 1060
+#define RESOURCE_SERVER_PORT 1062
 #define BUF_SIZE 256
 #define FILE_SIZE 32
 #define CACHE_SIZE 8
@@ -52,7 +52,7 @@ struct cachedFile{
 int serverSocket;
 static pthread_mutex_t cacheLock = PTHREAD_MUTEX_INITIALIZER;
 struct cachedFile* cacheArray[CACHE_SIZE];
-char fileName[FILE_SIZE];
+//char fileName[FILE_SIZE];
 
 
 //Takes in a name string and returns the resulting index for the hashmap 
@@ -68,8 +68,8 @@ int hashFileIndex(char * name){
 }
 
 //Parses the filename
-int * parseFileName(char * inputReceived){
-	int fileEndpoints[2];
+int * parseFileName(char * inputReceived, char * fileName){
+	static int fileEndpoints[2];
 	char * receiveLine = inputReceived;
 	//Find Where FileName Starts And Ends in receiveLine
 	for(int i=0; i<CACHE_SIZE; i++)
@@ -113,10 +113,11 @@ void printCache(){
 	printf("\nPrint Cache:");
 	for (int i=0; i<CACHE_SIZE; i++){
 		if(cacheArray[i]!=NULL){
-			printf("\nFile:%s\n", cacheArray[i]->fileName);
+			printf("\nPointer: %p\n", cacheArray[i]);
+			printf("Index: %d\n", i);
+			printf("File:%s\n", cacheArray[i]->fileName);
 			printf("Size:%d\n", cacheArray[i]->length);
 			printf("Contents:%s\n", cacheArray[i]->contents);
-			printf("Index:%d\n", i);
 		}
 	}
 }
@@ -128,10 +129,12 @@ void * store(void *inputReceived)
 	 char * receiveLine = (char*)inputReceived;
 	 char contents[BUF_SIZE];
 	 char fileLength[FILE_SIZE];
+	 char fileName[FILE_SIZE];
 	 int lengthEnd;
+	 int lengthParsed;
 	 char lengthOfFile[FILE_SIZE];
 	 // Run Parse File Name
-	 int fileEndpoints[2]= parseFileName(receiveLine);
+	 int * fileEndpoints = parseFileName(receiveLine, fileName);
 	
 	//Find Where Declared Length of File Ends
 	for(int i=0; i<BUF_SIZE; i++)
@@ -162,12 +165,13 @@ void * store(void *inputReceived)
 			
 	//Parse Length of File
 	int lengthIndex = 0;
-	for(int i=(fileEndpoints[1]+1); i<lengthEnd+FILE_SIZE; i++)
+	for(int i=(*(fileEndpoints+1)+1); i<lengthEnd+FILE_SIZE; i++)
 	{
 		if(i == lengthEnd) // Last Time through the loop add null terminator and reset index. atoi Function needs null terminator;
 		{
 			lengthOfFile[lengthIndex] = '\0';
 			lengthIndex = 0;
+			lengthParsed = atoi(lengthOfFile);
 			printf("Length: %s\n", lengthOfFile);
 		}
 		else
@@ -179,21 +183,22 @@ void * store(void *inputReceived)
 
 	//Find index
 	int index = hashFileIndex(fileName);
-
+	
+	printf("FileName:%s\n", fileName); 
 	//LOCK FILE HERE!!!!
 	pthread_mutex_lock(&cacheLock);
 	
 	printf("\nModifying File\n");
 
 	//Allocating memory
-	if (cacheArray[index]!=NULL){
-		cacheArray[index] = malloc(sizeof(cachedFile));
-	}
+	//if (cacheArray[index]!=NULL){
+	cacheArray[index] = malloc(sizeof(cachedFile));
+	//}
 
 	//Set the file
 	strcpy(cacheArray[index]->fileName,fileName);
 	strcpy(cacheArray[index]->contents,contents);
-	cacheArray[index]->length=strlen(contents);
+	cacheArray[index]->length=lengthParsed;
 
 	//Unlock here
 	pthread_mutex_unlock(&cacheLock);
@@ -207,7 +212,8 @@ void * store(void *inputReceived)
 void removeFile(void * inputReceived) {
 	printf("\nRemoving File\n");
 	char * receiveLine = (char *)inputReceived;
-	parseFileName(receiveLine);
+	char fileName[FILE_SIZE];
+	parseFileName(receiveLine, fileName);
 	int index = hashFileIndex(fileName);
 	if (strcmp(cacheArray[index]->fileName, fileName)==0){
 		//Lock here
@@ -223,8 +229,23 @@ void removeFile(void * inputReceived) {
 }
 
 //Returns the length of the file followed by the contents.
-void  load(void * inputReceived) {
+void load(void * inputReceived) {
 	printf("\nLoading File\n");
+	char * receiveLine = (char *)inputReceived;
+	char fileName[FILE_SIZE];
+	parseFileName(receiveLine, fileName);
+	int index = hashFileIndex(fileName);
+	if (strcmp(cacheArray[index]->fileName, fileName)==0){
+		//Lock here
+		pthread_mutex_lock(&cacheLock);
+
+		//Load Contents
+		//printCache();
+		printf("\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
+
+		//Unlock here
+		pthread_mutex_unlock(&cacheLock);
+	}
 }
 
 // We need to make sure we close the connection on signal received, otherwise we have to wait for server to timeout.
@@ -262,7 +283,7 @@ void * processClientRequest(void * request) {
 		}
 		else if(strncmp(receiveLine, "load", 4)==0)
 		{
-			//load(inputLine);
+			load(inputLine);
 		}
 		//END OUR CODE
 	  
