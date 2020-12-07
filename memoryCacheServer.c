@@ -264,6 +264,14 @@ void load(void * inputReceived, int request) {
 		}
 		else {
 			//send 0:
+			//Load Contents
+		snprintf(sendLine, sizeof(sendLine), "0:");
+		printf("Sending %s\n", sendLine);
+        write(connectionToClient, sendLine, strlen(sendLine));
+        
+        // Zero out the receive line so we do not get artifacts from before
+        bzero(&receiveLine, sizeof(receiveLine));
+        close(connectionToClient);
 		}
 	}
 }
