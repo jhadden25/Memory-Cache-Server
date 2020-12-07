@@ -20,9 +20,6 @@ Features:
 	-Thread safe. Also, the data structure that you use to manage the cache could be modified by two threads at once.
  	You should handle these cases appropriately. Be sure to ensure there are no memory leaks in your implementation. 
 
-	-The entry in a cache should only hold the most recently stored file. If there is a collision in your hash map,
-	replace the current entry with the new one that is being stored.
-
 Commands:
 	load filename (Returns the length of the file followed by the contents.)
 	store filename n:[contents]  (Saves the filename in the cache with n being the size and contents being the contents)
@@ -96,7 +93,7 @@ int * parseFileName(char * inputReceived, char * fileName){
 		if(receiveLine[i] == ' ')
 		{
 			fileName[tempCount] = '\0';
-			printf("File Name: %s\n", fileName);
+			//printf("File Name: %s\n", fileName);
 			break;
 		}
 		else
@@ -110,14 +107,15 @@ int * parseFileName(char * inputReceived, char * fileName){
 
 //Prints out information on files in cache
 void printCache(){
-	printf("\nPrint Cache:");
+	printf("\nPrinting Cache:\n\n");
 	for (int i=0; i<CACHE_SIZE; i++){
 		if(cacheArray[i]!=NULL){
-			printf("\nPointer: %p\n", cacheArray[i]);
+			//printf("Pointer: %p\n", cacheArray[i]);
 			printf("Index: %d\n", i);
 			printf("File:%s\n", cacheArray[i]->fileName);
 			printf("Size:%d\n", cacheArray[i]->length);
 			printf("Contents:%s\n", cacheArray[i]->contents);
+			printf("\n");
 		}
 	}
 }
@@ -126,6 +124,7 @@ void printCache(){
 void * store(void *inputReceived) 
 {
 	 printf("\nStoring File\n");
+	 printf("\n******************************************************************\n");
 	 char * receiveLine = (char*)inputReceived;
 	 char contents[BUF_SIZE];
 	 char fileLength[FILE_SIZE];
@@ -153,7 +152,7 @@ void * store(void *inputReceived)
 				if(receiveLine[i] == ']')
 				{
 					contents[tempCount] = '\0';
-					printf("Contents: %s\n", contents);
+					//printf("Contents: %s\n", contents);
 					break;
 				}
 				else
@@ -172,7 +171,7 @@ void * store(void *inputReceived)
 			lengthOfFile[lengthIndex] = '\0';
 			lengthIndex = 0;
 			lengthParsed = atoi(lengthOfFile);
-			printf("Length: %s\n", lengthOfFile);
+			//printf("Length: %s\n", lengthOfFile);
 		}
 		else
 		{
@@ -184,18 +183,16 @@ void * store(void *inputReceived)
 	//Find index
 	int index = hashFileIndex(fileName);
 	
-	printf("FileName:%s\n", fileName); 
-	printf("Index: %d\n", index);
+	//printf("FileName:%s\n", fileName); 
+	//printf("Index: %d\n", index);
 	
 	//LOCK FILE HERE!!!!
 	pthread_mutex_lock(&cacheLock);
 	
-	printf("\nModifying File\n");
-
 	//Allocating memory
-	//if (cacheArray[index]!=NULL){
-	cacheArray[index] = malloc(sizeof(cachedFile));
-	//}
+	if (cacheArray[index]==NULL){
+		cacheArray[index] = malloc(sizeof(cachedFile));
+	}
 
 	//Set the file
 	strcpy(cacheArray[index]->fileName,fileName);
@@ -205,9 +202,8 @@ void * store(void *inputReceived)
 	//Unlock here
 	pthread_mutex_unlock(&cacheLock);
 
-	printf("Worked\n");
+	//print out cache
 	printCache();
-	//free(cacheArray[index]);
 }
 
 //Deletes the file from the cache.
@@ -217,16 +213,19 @@ void removeFile(void * inputReceived) {
 	char fileName[FILE_SIZE];
 	parseFileName(receiveLine, fileName);
 	int index = hashFileIndex(fileName);
-	if (strcmp(cacheArray[index]->fileName, fileName)==0){
-		//Lock here
-		pthread_mutex_lock(&cacheLock);
-
-		//free or Null here
-		free(cacheArray[index]);
-
-		//Unlock here
-		pthread_mutex_unlock(&cacheLock);
-		printCache();
+	if(cacheArray[index]!=NULL){
+		if (strcmp(cacheArray[index]->fileName, fileName)==0){
+			//Lock here
+			pthread_mutex_lock(&cacheLock);
+			
+			//free or Null here
+			cacheArray[index]=NULL;
+			free(cacheArray[index]);
+			
+			//Unlock here
+			pthread_mutex_unlock(&cacheLock);
+			printCache();
+		}
 	}
 }
 
@@ -237,16 +236,24 @@ void load(void * inputReceived) {
 	char fileName[FILE_SIZE];
 	parseFileName(receiveLine, fileName);
 	int index = hashFileIndex(fileName);
-	if (strcmp(cacheArray[index]->fileName, fileName)==0){
-		//Lock here
-		pthread_mutex_lock(&cacheLock);
+	if(cacheArray[index]!=NULL){
+		if (strcmp(cacheArray[index]->fileName, fileName)==0){
+			//Lock here
+			pthread_mutex_lock(&cacheLock);
 
-		//Load Contents
-		//printCache();
-		printf("\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
-
-		//Unlock here
-		pthread_mutex_unlock(&cacheLock);
+			//Load Contents
+			//printCache();
+			printf("\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
+			
+			//Unlock here
+			pthread_mutex_unlock(&cacheLock);
+		}
+		else {
+			//send 0:
+		}
+	}
+	else{
+		//send 0:
 	}
 }
 
@@ -262,8 +269,9 @@ void * processClientRequest(void * request) {
     int connectionToClient = *(int *)request;
     char receiveLine[BUF_SIZE];
     char sendLine[BUF_SIZE];
-    
+    snprintf(sendLine, sizeof(sendLine), "true");
     int bytesReadFromClient = 0;
+
     // Read the request that the client has
     while ( (bytesReadFromClient = read(connectionToClient, receiveLine, BUF_SIZE)) > 0) {
         // Need to put a NULL string terminator at end
@@ -278,21 +286,25 @@ void * processClientRequest(void * request) {
 		if(strncmp(receiveLine, "store", 4)==0)
 		{
 			store(inputLine);
+			//snprintf(sendLine, sizeof(sendLine), "Received Store command");
 		}
 		else if(strncmp(receiveLine, "rm", 2)==0)
 		{
-			//removeFile(inputLine);
+			removeFile(inputLine);
+			//snprintf(sendLine, sizeof(sendLine), "Received Remove command");
 		}
 		else if(strncmp(receiveLine, "load", 4)==0)
 		{
 			load(inputLine);
+			//snprintf(sendLine, sizeof(sendLine), "Received Load command");
+		}
+		
+		else{
+			snprintf(sendLine, sizeof(sendLine), "Please use correct syntax");
 		}
 		//END OUR CODE
 	  
-        // Print text out to buffer, and then write it to client (connfd)
-        snprintf(sendLine, sizeof(sendLine), "true");
-      
-        printf("Sending %s\n", sendLine);
+        printf("Sending: %s\n", sendLine);
         write(connectionToClient, sendLine, strlen(sendLine));
         
         // Zero out the receive line so we do not get artifacts from before
@@ -320,7 +332,10 @@ int main(int argc, char *argv[]) {
         printf("Unable to bind to port just yet, perhaps the connection has to be timed out\n");
         exit(-1);
     }
-    
+
+    //Able to start
+    printf("\nStarted Memory Cache Server\n");
+
     // Before we listen, register for Ctrl+C being sent so we can close our connection
     struct sigaction sigIntHandler;
     sigIntHandler.sa_handler = closeConnection;
