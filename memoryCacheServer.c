@@ -224,7 +224,9 @@ void removeFile(void * inputReceived) {
 }
 
 //Returns the length of the file followed by the contents.
-void load(void * inputReceived) {
+void load(void * inputReceived, int request) {
+	char sendLine[BUF_SIZE];
+	int connectionToClient = request;
 	printf("\nLoading File\n");
 	char * receiveLine = (char *)inputReceived;
 	parseFileName(receiveLine);
@@ -234,8 +236,14 @@ void load(void * inputReceived) {
 		pthread_mutex_lock(&cacheLock);
 
 		//Load Contents
-		//printCache();
-		printf("\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
+		snprintf(sendLine, sizeof(sendLine), "\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
+		printf("Sending %s\n", sendLine);
+        write(connectionToClient, sendLine, strlen(sendLine));
+        
+        // Zero out the receive line so we do not get artifacts from before
+        bzero(&receiveLine, sizeof(receiveLine));
+        close(connectionToClient);
+		//printf("\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
 
 		//Unlock here
 		pthread_mutex_unlock(&cacheLock);
@@ -277,7 +285,7 @@ void * processClientRequest(void * request) {
 		}
 		else if(strncmp(receiveLine, "load", 4)==0)
 		{
-			load(inputLine);
+			load(inputLine, connectionToClient);
 		}
 		//END OUR CODE
 	  

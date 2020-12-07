@@ -44,8 +44,8 @@ int main(int argc, char *argv[]) {
     
     // snprintf allows you to write to a buffer, think of it as a formatted print into an array
     //snprintf(sendLine, sizeof(sendLine), "store myTest 40:[content of the initial test]");
-    snprintf(sendLine, sizeof(sendLine), "store myOtherrTest 4096:[content of the other test]");
-    //snprintf(sendLine, sizeof(sendLine), "load myOtherTest");
+    //snprintf(sendLine, sizeof(sendLine), "store myOtherTest 4096:[content of the other test]");
+    snprintf(sendLine, sizeof(sendLine), "load myTest");
 	
     // Write will actually write to a file (in this case a socket) which will transmit it to the server
     write(serverSocket, sendLine, strlen(sendLine));
