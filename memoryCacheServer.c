@@ -10,7 +10,7 @@
 #include <semaphore.h>
 #include <stdbool.h>
 
-#define RESOURCE_SERVER_PORT 1060///
+#define RESOURCE_SERVER_PORT 1060
 #define BUF_SIZE 256
 #define FILE_SIZE 32
 #define CACHE_SIZE 8
@@ -19,9 +19,6 @@
 Features:
 	-Thread safe. Also, the data structure that you use to manage the cache could be modified by two threads at once.
  	You should handle these cases appropriately. Be sure to ensure there are no memory leaks in your implementation. 
-
-	-The entry in a cache should only hold the most recently stored file. If there is a collision in your hash map,
-	replace the current entry with the new one that is being stored.
 
 Commands:
 	load filename (Returns the length of the file followed by the contents.)
@@ -52,9 +49,8 @@ struct cachedFile{
 int serverSocket;
 static pthread_mutex_t cacheLock = PTHREAD_MUTEX_INITIALIZER;
 struct cachedFile* cacheArray[CACHE_SIZE];
-char fileName[FILE_SIZE];
-int fileStart;
-int fileEnd;
+//char fileName[FILE_SIZE];
+
 
 //Takes in a name string and returns the resulting index for the hashmap 
 int hashFileIndex(char * name){
@@ -69,20 +65,20 @@ int hashFileIndex(char * name){
 }
 
 //Parses the filename
-void parseFileName(char * inputReceived){
-	//Can't return an array, so we must modify existing strings
+int * parseFileName(char * inputReceived, char * fileName){
+	static int fileEndpoints[2];
 	char * receiveLine = inputReceived;
 	//Find Where FileName Starts And Ends in receiveLine
 	for(int i=0; i<CACHE_SIZE; i++)
 	{
 		if(receiveLine[i] == ' ')
 		{
-			fileStart = i+1;
-			for(int j=(fileStart); j<(fileStart+FILE_SIZE); j++)
+			fileEndpoints[0] = i+1;
+			for(int j=(fileEndpoints[0]); j<(fileEndpoints[0]+FILE_SIZE); j++)
 			{
 				if(receiveLine[j] == ' ' || receiveLine[j] == '\0')
 				{
-					fileEnd = j;
+					fileEndpoints[1] = j;
 					break;
 				}
 			}
@@ -92,12 +88,12 @@ void parseFileName(char * inputReceived){
 	
 	// Parse File Name to fileName[]
 	int tempCount = 0;
-	for(int i=fileStart; i<fileEnd+1; i++)
+	for(int i=fileEndpoints[0]; i<fileEndpoints[1]+1; i++)
 	{
 		if(receiveLine[i] == ' ')
 		{
 			fileName[tempCount] = '\0';
-			printf("File Name: %s\n", fileName);
+			//printf("File Name: %s\n", fileName);
 			break;
 		}
 		else
@@ -106,18 +102,20 @@ void parseFileName(char * inputReceived){
 			tempCount++;
 		}
 	}
+	return fileEndpoints;
 }
 
 //Prints out information on files in cache
 void printCache(){
-	printf("\nPrint Cache:");
+	printf("\nPrinting Cache:\n\n");
 	for (int i=0; i<CACHE_SIZE; i++){
 		if(cacheArray[i]!=NULL){
-			printf("\nFile:%s\n", cacheArray[i]->fileName);
+			//printf("Pointer: %p\n", cacheArray[i]);
+			printf("Index: %d\n", i);
+			printf("File:%s\n", cacheArray[i]->fileName);
 			printf("Size:%d\n", cacheArray[i]->length);
 			printf("Contents:%s\n", cacheArray[i]->contents);
-			printf("Index:%d\n", i);
-			
+			printf("\n");
 		}
 	}
 }
@@ -126,14 +124,16 @@ void printCache(){
 void * store(void *inputReceived) 
 {
 	 printf("\nStoring File\n");
+	 printf("\n******************************************************************\n");
 	 char * receiveLine = (char*)inputReceived;
 	 char contents[BUF_SIZE];
 	 char fileLength[FILE_SIZE];
+	 char fileName[FILE_SIZE];
 	 int lengthEnd;
 	 int lengthParsed;
 	 char lengthOfFile[FILE_SIZE];
 	 // Run Parse File Name
-	 parseFileName(receiveLine);
+	 int * fileEndpoints = parseFileName(receiveLine, fileName);
 	
 	//Find Where Declared Length of File Ends
 	for(int i=0; i<BUF_SIZE; i++)
@@ -152,7 +152,7 @@ void * store(void *inputReceived)
 				if(receiveLine[i] == ']')
 				{
 					contents[tempCount] = '\0';
-					printf("Contents: %s\n", contents);
+					//printf("Contents: %s\n", contents);
 					break;
 				}
 				else
@@ -164,14 +164,14 @@ void * store(void *inputReceived)
 			
 	//Parse Length of File
 	int lengthIndex = 0;
-	for(int i=(fileEnd+1); i<lengthEnd+FILE_SIZE; i++)
+	for(int i=(*(fileEndpoints+1)+1); i<lengthEnd+FILE_SIZE; i++)
 	{
 		if(i == lengthEnd) // Last Time through the loop add null terminator and reset index. atoi Function needs null terminator;
 		{
 			lengthOfFile[lengthIndex] = '\0';
 			lengthIndex = 0;
 			lengthParsed = atoi(lengthOfFile);
-			printf("Length: %s\n", lengthOfFile);
+			//printf("Length: %s\n", lengthOfFile);
 		}
 		else
 		{
@@ -182,14 +182,17 @@ void * store(void *inputReceived)
 
 	//Find index
 	int index = hashFileIndex(fileName);
-
+	
+	//printf("FileName:%s\n", fileName); 
+	//printf("Index: %d\n", index);
+	
 	//LOCK FILE HERE!!!!
 	pthread_mutex_lock(&cacheLock);
 	
-	printf("\nModifying File\n");
-
 	//Allocating memory
-	cacheArray[index] = malloc(sizeof(cachedFile));
+	if (cacheArray[index]==NULL){
+		cacheArray[index] = malloc(sizeof(cachedFile));
+	}
 
 	//Set the file
 	strcpy(cacheArray[index]->fileName,fileName);
@@ -199,28 +202,31 @@ void * store(void *inputReceived)
 	//Unlock here
 	pthread_mutex_unlock(&cacheLock);
 
-	printf("Worked\n");
+	//print out cache
 	printCache();
-	free(cacheArray[index]);
 }
 
 //Deletes the file from the cache.
 void removeFile(void * inputReceived) {
 	printf("\nRemoving File\n");
 	char * receiveLine = (char *)inputReceived;
-	parseFileName(receiveLine);
+	char fileName[FILE_SIZE];
+	parseFileName(receiveLine, fileName);
 	int index = hashFileIndex(fileName);
-	//if (strcmp(cacheArray[index]->fileName, fileName)==0){
-		//Lock here
-		//pthread_mutex_lock(&cacheLock);
-
-		//free or Null here
-		free(cacheArray[index]);
-
-		//Unlock here
-		//pthread_mutex_unlock(&cacheLock);
-		printCache();
-	//}
+	if(cacheArray[index]!=NULL){
+		if (strcmp(cacheArray[index]->fileName, fileName)==0){
+			//Lock here
+			pthread_mutex_lock(&cacheLock);
+			
+			//free or Null here
+			cacheArray[index]=NULL;
+			free(cacheArray[index]);
+			
+			//Unlock here
+			pthread_mutex_unlock(&cacheLock);
+			printCache();
+		}
+	}
 }
 
 //Returns the length of the file followed by the contents.
@@ -229,11 +235,13 @@ void load(void * inputReceived, int request) {
 	int connectionToClient = request;
 	printf("\nLoading File\n");
 	char * receiveLine = (char *)inputReceived;
-	parseFileName(receiveLine);
+	char fileName[FILE_SIZE];
+	parseFileName(receiveLine, fileName);
 	int index = hashFileIndex(fileName);
-	if (strcmp(cacheArray[index]->fileName, fileName)==0){
-		//Lock here
-		pthread_mutex_lock(&cacheLock);
+	if(cacheArray[index]!=NULL){
+		if (strcmp(cacheArray[index]->fileName, fileName)==0){
+			//Lock here
+			pthread_mutex_lock(&cacheLock);
 
 		//Load Contents
 		snprintf(sendLine, sizeof(sendLine), "\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
@@ -247,6 +255,16 @@ void load(void * inputReceived, int request) {
 
 		//Unlock here
 		pthread_mutex_unlock(&cacheLock);
+			//Load Contents
+			//printCache();
+			printf("\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
+			
+			//Unlock here
+			pthread_mutex_unlock(&cacheLock);
+		}
+		else {
+			//send 0:
+		}
 	}
 }
 
@@ -262,8 +280,9 @@ void * processClientRequest(void * request) {
     int connectionToClient = *(int *)request;
     char receiveLine[BUF_SIZE];
     char sendLine[BUF_SIZE];
-    
+    snprintf(sendLine, sizeof(sendLine), "true");
     int bytesReadFromClient = 0;
+
     // Read the request that the client has
     while ( (bytesReadFromClient = read(connectionToClient, receiveLine, BUF_SIZE)) > 0) {
         // Need to put a NULL string terminator at end
@@ -278,21 +297,24 @@ void * processClientRequest(void * request) {
 		if(strncmp(receiveLine, "store", 4)==0)
 		{
 			store(inputLine);
+			//snprintf(sendLine, sizeof(sendLine), "Received Store command");
 		}
 		else if(strncmp(receiveLine, "rm", 2)==0)
 		{
-			//removeFile(inputLine);
+			removeFile(inputLine);
+			//snprintf(sendLine, sizeof(sendLine), "Received Remove command");
 		}
 		else if(strncmp(receiveLine, "load", 4)==0)
 		{
 			load(inputLine, connectionToClient);
+			//snprintf(sendLine, sizeof(sendLine), "Received Load command");
+		}
+		else{
+			snprintf(sendLine, sizeof(sendLine), "Please use correct syntax");
 		}
 		//END OUR CODE
 	  
-        // Print text out to buffer, and then write it to client (connfd)
-        snprintf(sendLine, sizeof(sendLine), "true");
-      
-        printf("Sending %s\n", sendLine);
+        printf("Sending: %s\n", sendLine);
         write(connectionToClient, sendLine, strlen(sendLine));
         
         // Zero out the receive line so we do not get artifacts from before
@@ -320,7 +342,10 @@ int main(int argc, char *argv[]) {
         printf("Unable to bind to port just yet, perhaps the connection has to be timed out\n");
         exit(-1);
     }
-    
+
+    //Able to start
+    printf("\nStarted Memory Cache Server\n");
+
     // Before we listen, register for Ctrl+C being sent so we can close our connection
     struct sigaction sigIntHandler;
     sigIntHandler.sa_handler = closeConnection;
