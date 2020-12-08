@@ -10,17 +10,23 @@
 #define SERVER_PORT 1060 /// CHANGE!
 #define BUF_SIZE 256
 
-int main(int argc, char *argv[]) {
+char store[BUF_SIZE];
+char * content= " 4096:[content]";
+char sendLine[BUF_SIZE];
+char receiveLine[BUF_SIZE];
+
+void * fill(void * character){
+    printf("\nFilling\n");
+    strcpy(store, "store ");
     int serverSocket, bytesRead;
     
     // These are the buffers to talk back and forth with the server
-    char sendLine[BUF_SIZE];
-    char receiveLine[BUF_SIZE];
-    
+    char * name = (char *) character;
     // Create socket to server
     if ( (serverSocket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         printf("Unable to create socket\n");
-        return -1;
+    	exit(-1);
+	//    return -1;
     }
     
     // Setup server connection
@@ -34,19 +40,20 @@ int main(int argc, char *argv[]) {
     // Try to convert character representation of IP to binary
     if (inet_pton(AF_INET, "127.0.0.1", &serverAddress.sin_addr) <= 0) {
         printf("Unable to convert IP for server address\n");
-        return -1;
+    	exit(-1);
+	//    return -1;
     }
     
     // Connect to server, if we cannot connect, then exit out
     if (connect(serverSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0) {
         printf("Unable to connect to server");
+    	exit(-1);
     }
     
-    // snprintf allows you to write to a buffer, think of it as a formatted print into an array
-    //snprintf(sendLine, sizeof(sendLine), "store myTest 40:[content of the initial test]");
-    snprintf(sendLine, sizeof(sendLine), "store myTest 4096:[content of the other test]");
-    //snprintf(sendLine, sizeof(sendLine), "load myOtherTest");
-	
+    strcat(store, name);
+    strcat(store, content);
+    strcpy(sendLine, store);
+    printf("\nSending: %s\n", sendLine);
     // Write will actually write to a file (in this case a socket) which will transmit it to the server
     write(serverSocket, sendLine, strlen(sendLine));
     
@@ -62,5 +69,24 @@ int main(int argc, char *argv[]) {
     
     // Close the server socket
     close(serverSocket);
+    //return 1;
 }
 
+int main(int argc, char *argv[]) {;
+	char * a = "a";
+	char * b = "b";
+	char * c = "c";
+	char * d = "d";
+	char * e = "e";
+	char * f = "f";
+	char * g = "g";
+	char * h = "h";
+	fill(a);
+	fill(b);
+	fill(c);
+	fill(d);
+	fill(e);
+	fill(f);
+	fill(g);
+	fill(h);
+}
