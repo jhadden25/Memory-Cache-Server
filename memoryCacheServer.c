@@ -49,17 +49,15 @@ struct cachedFile{
 int serverSocket;
 static pthread_mutex_t cacheLock = PTHREAD_MUTEX_INITIALIZER;
 struct cachedFile* cacheArray[CACHE_SIZE];
-//char fileName[FILE_SIZE];
-
 
 //Takes in a name string and returns the resulting index for the hashmap 
 int hashFileIndex(char * name){
     int hash = 0;
-	//Iterates through the char * name and takes the numerical values of the characters and multiplies by the prime number 53
+    //Iterates through the char * name and takes the numerical values of the characters and multiplies by the prime number 53
     for(int i = 0; i < strlen(name); i++){
         hash += ((int)name[i]) * 53;
     }
-	//Sets the hash as the modulus of the resulting hash and the size of the cache
+    //Sets the hash as the modulus of the resulting hash and the size of the cache
     hash %= CACHE_SIZE;
     return hash;
 }
@@ -76,7 +74,7 @@ int * parseFileName(char * inputReceived, char * fileName){
 			fileEndpoints[0] = i+1;
 			for(int j=(fileEndpoints[0]); j<(fileEndpoints[0]+FILE_SIZE); j++)
 			{
-				if(receiveLine[j] == ' ' || receiveLine[j] == '\0')
+				if(receiveLine[j] == ' ' || receiveLine[j] == '\0' || receiveLine[j]=='\n')
 				{
 					fileEndpoints[1] = j;
 					break;
@@ -90,7 +88,7 @@ int * parseFileName(char * inputReceived, char * fileName){
 	int tempCount = 0;
 	for(int i=fileEndpoints[0]; i<fileEndpoints[1]+1; i++)
 	{
-		if(receiveLine[i] == ' ')
+		if(receiveLine[i] == ' ' || receiveLine[i]== '\n')
 		{
 			fileName[tempCount] = '\0';
 			//printf("File Name: %s\n", fileName);
@@ -111,6 +109,7 @@ void printCache(){
 	for (int i=0; i<CACHE_SIZE; i++){
 		if(cacheArray[i]!=NULL){
 			//printf("Pointer: %p\n", cacheArray[i]);
+			//printf("Name length: %d\n", (int)strlen(cacheArray[i]->fileName));
 			printf("Index: %d\n", i);
 			printf("File:%s\n", cacheArray[i]->fileName);
 			printf("Size:%d\n", cacheArray[i]->length);
@@ -121,17 +120,18 @@ void printCache(){
 }
 
 //Saves the filename in the cache with n being the size and contents being the contents
-void * store(void *inputReceived) 
-{
+void * store(void *inputReceived) {
 	 printf("\nStoring File\n");
 	 printf("\n******************************************************************\n");
+	 
+	 int lengthEnd;
+	 int lengthParsed;
 	 char * receiveLine = (char*)inputReceived;
 	 char contents[BUF_SIZE];
 	 char fileLength[FILE_SIZE];
 	 char fileName[FILE_SIZE];
-	 int lengthEnd;
-	 int lengthParsed;
 	 char lengthOfFile[FILE_SIZE];
+	
 	 // Run Parse File Name
 	 int * fileEndpoints = parseFileName(receiveLine, fileName);
 	
@@ -182,7 +182,6 @@ void * store(void *inputReceived)
 
 	//Find index
 	int index = hashFileIndex(fileName);
-	
 	//printf("FileName:%s\n", fileName); 
 	//printf("Index: %d\n", index);
 	
@@ -202,77 +201,76 @@ void * store(void *inputReceived)
 	//Unlock here
 	pthread_mutex_unlock(&cacheLock);
 
-	//print out cache
+	//Print out the cache
 	printCache();
 }
 
 //Deletes the file from the cache.
 void removeFile(void * inputReceived) {
 	printf("\nRemoving File\n");
+	printf("\n******************************************************************\n");
+	
 	char * receiveLine = (char *)inputReceived;
 	char fileName[FILE_SIZE];
 	parseFileName(receiveLine, fileName);
 	int index = hashFileIndex(fileName);
-	if(cacheArray[index]!=NULL){
-		if (strcmp(cacheArray[index]->fileName, fileName)==0){
-			//Lock here
-			pthread_mutex_lock(&cacheLock);
-			
-			//free or Null here
-			cacheArray[index]=NULL;
-			free(cacheArray[index]);
-			
-			//Unlock here
-			pthread_mutex_unlock(&cacheLock);
-			printCache();
-		}
+	if(cacheArray[index]!=NULL && strcmp(cacheArray[index]->fileName, fileName)==0){
+		//Lock here
+		pthread_mutex_lock(&cacheLock);
+		
+		//free or Null here
+		*(cacheArray[index]->fileName)='\0';
+		*(cacheArray[index]->contents)='\0';
+		cacheArray[index]->length=0;
+		free(cacheArray[index]);
+		cacheArray[index]=NULL;
+		
+		//Unlock here
+		pthread_mutex_unlock(&cacheLock);
 	}
+	printCache();
 }
 
 //Returns the length of the file followed by the contents.
 void load(void * inputReceived, int request) {
-	char sendLine[BUF_SIZE];
-	int connectionToClient = request;
 	printf("\nLoading File\n");
+	printf("\n******************************************************************\n");
+
+	int connectionToClient = request;
 	char * receiveLine = (char *)inputReceived;
+	char sendLine[BUF_SIZE];
 	char fileName[FILE_SIZE];
 	parseFileName(receiveLine, fileName);
 	int index = hashFileIndex(fileName);
-	if(cacheArray[index]!=NULL){
-		if (strcmp(cacheArray[index]->fileName, fileName)==0){
-			//Lock here
-			pthread_mutex_lock(&cacheLock);
+	if(cacheArray[index]!=NULL && strcmp(cacheArray[index]->fileName, fileName)==0){
+		//Lock here
+		pthread_mutex_lock(&cacheLock);
 
 		//Load Contents
 		snprintf(sendLine, sizeof(sendLine), "\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
 		printf("Sending %s\n", sendLine);
-        write(connectionToClient, sendLine, strlen(sendLine));
-        
-        // Zero out the receive line so we do not get artifacts from before
-        bzero(&receiveLine, sizeof(receiveLine));
-        close(connectionToClient);
+        	write(connectionToClient, sendLine, strlen(sendLine));
+
+        	// Zero out the receive line so we do not get artifacts from before
+        	bzero(&receiveLine, sizeof(receiveLine));
+        	close(connectionToClient);
 		//printf("\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
 
 		//Unlock here
 		pthread_mutex_unlock(&cacheLock);
-			//Load Contents
-			//printCache();
-			printf("\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
-			
-			//Unlock here
-			pthread_mutex_unlock(&cacheLock);
-		}
-		else {
-			//send 0:
-			//Load Contents
+		
+		//printCache();
+		printf("\n%d:[%s] \n", cacheArray[index]->length, cacheArray[index]->contents);
+	}
+	else {
+		//Send 0:
 		snprintf(sendLine, sizeof(sendLine), "0:");
 		printf("Sending %s\n", sendLine);
-        write(connectionToClient, sendLine, strlen(sendLine));
-        
-        // Zero out the receive line so we do not get artifacts from before
-        bzero(&receiveLine, sizeof(receiveLine));
-        close(connectionToClient);
-		}
+       		write(connectionToClient, sendLine, strlen(sendLine));
+       		
+    		// Zero out the receive line so we do not get artifacts from before
+        	bzero(&receiveLine, sizeof(receiveLine));
+        	close(connectionToClient);
 	}
 }
 
@@ -286,10 +284,10 @@ void closeConnection() {
 // Handle request
 void * processClientRequest(void * request) {
     int connectionToClient = *(int *)request;
+    int bytesReadFromClient = 0;
     char receiveLine[BUF_SIZE];
     char sendLine[BUF_SIZE];
     snprintf(sendLine, sizeof(sendLine), "true");
-    int bytesReadFromClient = 0;
 
     // Read the request that the client has
     while ( (bytesReadFromClient = read(connectionToClient, receiveLine, BUF_SIZE)) > 0) {
